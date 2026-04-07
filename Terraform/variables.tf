@@ -48,3 +48,8 @@ variable "vms" {
     }
   }
 }
+
+variable "ssh_public_key" {
+  description = "Clé publique SSH pour l'accès aux VMs"
+  type        = string
+}

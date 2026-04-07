@@ -40,6 +40,7 @@ resource "libvirt_cloudinit_disk" "vm_init" {
 
   user_data = templatefile("${path.module}/config/cloud-init.yml", {
     hostname = each.key
+    ssh_public_key = var.ssh_public_key
   })
 
   meta_data = jsonencode({
