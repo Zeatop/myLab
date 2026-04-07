@@ -39,7 +39,7 @@ resource "libvirt_cloudinit_disk" "vm_init" {
   name = "${each.key}-cloudinit.iso"
 
   user_data = templatefile("${path.module}/config/cloud-init.yml", {
-    hostname = each.key
+    hostname       = each.key
     ssh_public_key = var.ssh_public_key
   })
 
@@ -92,12 +92,18 @@ resource "libvirt_domain" "vm" {
     acpi = true
   }
 
-  # Périphériques : disques, interfaces réseau, console, graphics
+  # Périphériques : disques, interfaces réseau, console
   devices = {
     # Disques
     disks = [
       {
         # Disque principal (clone de l'image Ubuntu)
+        # driver type = qcow2 est indispensable sinon QEMU lit en raw
+        # et l'image avec backing store ne boot pas
+        driver = {
+          name = "qemu"
+          type = "qcow2"
+        }
         source = {
           volume = {
             pool   = "default"
@@ -112,6 +118,10 @@ resource "libvirt_domain" "vm" {
       {
         # Disque cloud-init (ISO)
         device = "cdrom"
+        driver = {
+          name = "qemu"
+          type = "raw"
+        }
         source = {
           volume = {
             pool   = "default"

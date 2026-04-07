@@ -98,6 +98,10 @@ log "libvirtd redémarré (status: $(systemctl is-active libvirtd))"
 
 # =============================================================================
 # Étape 4 : Démarrage des VMs
+#
+# Note : on utilise STARTED=$((STARTED + 1)) au lieu de ((STARTED++))
+# car ((STARTED++)) retourne un code 1 quand STARTED vaut 0,
+# ce qui fait planter le script avec set -e.
 # =============================================================================
 log "Démarrage des VMs..."
 STARTED=0
@@ -107,16 +111,16 @@ for vm in "${VMS[@]}"; do
   STATE=$(virsh domstate "$vm" 2>/dev/null || echo "unknown")
   if [[ "$STATE" == "running" ]]; then
     log "$vm déjà en cours d'exécution"
-    ((STARTED++))
+    STARTED=$((STARTED + 1))
     continue
   fi
 
   if virsh start "$vm" 2>/dev/null; then
     log "$vm démarré"
-    ((STARTED++))
+    STARTED=$((STARTED + 1))
   else
     echo -e "${RED}[ERREUR]${NC} $vm n'a pas pu démarrer"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
   fi
 done
 
@@ -125,15 +129,22 @@ echo "========================================="
 echo " Résultat : $STARTED démarrées, $FAILED en erreur"
 echo "========================================="
 
-[[ $FAILED -gt 0 ]] && error "Certaines VMs n'ont pas démarré"
+if [[ $FAILED -gt 0 ]]; then
+  warn "Certaines VMs n'ont pas démarré, vérifiez les logs"
+fi
 
 # =============================================================================
 # Étape 5 : Attente de cloud-init + vérification des IPs
 # =============================================================================
-log "Attente de 30s pour cloud-init..."
-sleep 30
+log "Attente de 60s pour cloud-init..."
+sleep 60
 
-log "Vérification des IPs..."
+log "Vérification des baux DHCP..."
+echo ""
+virsh net-dhcp-leases vm-network
+
+echo ""
+log "Vérification des IPs par VM..."
 echo ""
 for vm in "${VMS[@]}"; do
   IP=$(virsh domifaddr "$vm" 2>/dev/null | grep -oP '192\.168\.122\.\d+' || echo "pas d'IP")
