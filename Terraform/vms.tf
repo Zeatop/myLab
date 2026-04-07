@@ -38,7 +38,7 @@ resource "libvirt_cloudinit_disk" "vm_init" {
 
   name = "${each.key}-cloudinit.iso"
 
-  user_data = templatefile("${path.module}/cloud-init.yml", {
+  user_data = templatefile("${path.module}/config/cloud-init.yml", {
     hostname = each.key
   })
 
@@ -47,7 +47,7 @@ resource "libvirt_cloudinit_disk" "vm_init" {
     "local-hostname" = each.key
   })
 
-  network_config = templatefile("${path.module}/network-config.yml", {
+  network_config = templatefile("${path.module}/config/network-config.yml", {
     ip      = each.value.ip
     gateway = "192.168.122.1"
     dns     = "192.168.122.1"
