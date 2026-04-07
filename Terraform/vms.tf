@@ -49,9 +49,7 @@ resource "libvirt_cloudinit_disk" "vm_init" {
   })
 
   network_config = templatefile("${path.module}/config/network-config.yml", {
-    ip      = each.value.ip
-    gateway = "192.168.122.1"
-    dns     = "192.168.122.1"
+    mac = each.value.mac
   })
 }
 
