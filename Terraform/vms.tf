@@ -154,17 +154,6 @@ resource "libvirt_domain" "vm" {
         }
       }
     ]
-
-    # Affichage graphique
-    graphics = [
-      {
-        type       = "spice"
-        auto_port  = "yes"
-        listen = {
-          type = "address"
-        }
-      }
-    ]
   }
 }
 
