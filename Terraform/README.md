@@ -48,8 +48,9 @@ Terraform/
 ├── variables.tf         # Specs de toutes les VMs (RAM, CPU, disque, IP, MAC)
 ├── network.tf           # Réseau NAT + réservations DHCP + DNS interne
 ├── vms.tf               # Création des VMs (volumes, cloud-init, domaines)
-├── cloud-init.yml       # Configuration au premier boot (utilisateur, SSH, hostname)
-├── network-config.yml   # Configuration réseau statique des VMs
+├── config 
+├──── cloud-init.yml       # Configuration au premier boot (utilisateur, SSH, hostname)
+├──── network-config.yml   # Configuration réseau statique des VMs
 └── README.md            # Ce fichier
 ```
 

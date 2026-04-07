@@ -1,0 +1,21 @@
+#cloud-config
+
+hostname: ${hostname}
+
+users:
+  - name: zeatop
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    groups: [sudo]
+    ssh_authorized_keys:
+      # Remplace par ta clé publique : cat ~/.ssh/id_rsa.pub
+      - ssh-rsa AAAA_REMPLACE_PAR_TA_CLE_PUBLIQUE
+
+packages:
+  - qemu-guest-agent
+  - curl
+  - wget
+  - apt-transport-https
+
+runcmd:
+  - systemctl enable --now qemu-guest-agent
