@@ -1,57 +1,83 @@
 # =============================================================================
-# vms.tf - Création des VMs Ubuntu via clone du template Proxmox
+# vms.tf - Création des VMs Ubuntu via clone du template
+#
+# Le provider bpg/proxmox utilise proxmox_virtual_environment_vm
+# et gère le cloud-init via le bloc "initialization"
 # =============================================================================
 
-resource "proxmox_vm_qemu" "vm" {
+resource "proxmox_virtual_environment_vm" "vm" {
   for_each = var.vms
 
-  name        = each.key
-  vmid        = each.value.vmid
-  target_node = var.proxmox_node
-  desc        = "VM ${each.key} - provisionné par Terraform"
+  name      = each.key
+  vm_id     = each.value.vmid
+  node_name = var.proxmox_node
 
-  clone      = var.template_name
-  full_clone = true
+  # Clone du template Ubuntu 24.04 (créé manuellement avec ID 9000)
+  clone {
+    vm_id = 9000
+    full  = true
+  }
 
-  cores   = each.value.vcpu
-  memory  = each.value.memory
-  sockets = 1
-  cpu     = "host"
+  # CPU
+  cpu {
+    cores = each.value.vcpu
+    type  = "host"
+  }
 
-  os_type = "cloud-init"
+  # RAM
+  memory {
+    dedicated = each.value.memory
+  }
 
-  scsihw = "virtio-scsi-pci"
+  # Disque principal
   disk {
-    size    = each.value.disk
-    type    = "scsi"
-    storage = "local-lvm"
+    datastore_id = "local-lvm"
+    interface    = "scsi0"
+    size         = each.value.disk
+    discard      = "on"
+    iothread     = true
   }
 
-  network {
-    model  = "virtio"
+  # Réseau
+  network_device {
     bridge = "vmbr0"
+    model  = "virtio"
   }
 
-  ciuser  = "zeatop"
-  sshkeys = var.ssh_public_key
+  # Cloud-init : remplace cloud-init.yml et network-config.yml
+  initialization {
+    datastore_id = "local-lvm"
 
-  ipconfig0  = "ip=${each.value.ip}/24,gw=${each.value.gateway}"
-  nameserver = "192.168.1.254"
+    ip_config {
+      ipv4 {
+        address = "${each.value.ip}/24"
+        gateway = "192.168.1.254"
+      }
+    }
 
-  agent = 1
-  onboot = true
-
-  lifecycle {
-    ignore_changes = [
-      network,
-    ]
+    user_account {
+      username = "zeatop"
+      keys     = [trimspace(var.ssh_public_key)]
+    }
   }
+
+  # QEMU Guest Agent
+  agent {
+    enabled = true
+  }
+
+  # Démarrage automatique
+  on_boot = true
+
+  # Arrêter la VM quand Terraform la supprime
+  stop_on_destroy = true
 }
 
+# --- Output : IPs des VMs ---
 output "vm_ips" {
   description = "IPs des VMs créées"
   value = {
-    for name, vm in proxmox_vm_qemu.vm :
-    name => vm.default_ipv4_address
+    for name, vm in proxmox_virtual_environment_vm.vm :
+    name => vm.ipv4_addresses
   }
 }
