@@ -1,172 +1,84 @@
 # =============================================================================
-# vms.tf - Création des VMs (boucle sur la variable "vms")
+# vms.tf - Création des VMs (clone du template Ubuntu)
+#
+# Avec Proxmox, une seule ressource remplace les 4 qu'on avait avec libvirt :
+# - libvirt_volume (disque)       → intégré dans proxmox_vm_qemu
+# - libvirt_cloudinit_disk        → intégré (ipconfig0, ciuser, sshkeys)
+# - libvirt_volume.vm_cloudinit   → plus nécessaire
+# - libvirt_domain                → proxmox_vm_qemu
 # =============================================================================
 
-# --- Disque de chaque VM ---
-# En v0.9+, on utilise "backing_store" au lieu de "base_volume_id"
-# et "capacity" au lieu de "size"
-resource "libvirt_volume" "vm_disk" {
-  for_each = var.vms
-
-  name = "${each.key}-disk.qcow2"
-  pool = "default"
-
-  # Le format est sous target.format.type
-  target = {
-    format = {
-      type = "qcow2"
-    }
-  }
-
-  # Clone depuis l'image de base via backing_store
-  backing_store = {
-    path   = libvirt_volume.ubuntu_base.path
-    format = {
-      type = "qcow2"
-    }
-  }
-
-  # Taille du disque
-  capacity      = each.value.disk
-  capacity_unit = "bytes"
+# Filtrer uniquement les VMs qui se clonent depuis le template Ubuntu
+locals {
+  ubuntu_vms = { for k, v in var.vms : k => v if v.clone == true }
 }
 
-# --- Cloud-init pour la configuration initiale ---
-# En v0.9+, meta_data est obligatoire
-resource "libvirt_cloudinit_disk" "vm_init" {
-  for_each = var.vms
+resource "proxmox_vm_qemu" "vm" {
+  for_each = local.ubuntu_vms
 
-  name = "${each.key}-cloudinit.iso"
-
-  user_data = templatefile("${path.module}/config/cloud-init.yml", {
-    hostname       = each.key
-    ssh_public_key = var.ssh_public_key
-  })
-
-  meta_data = jsonencode({
-    "instance-id"    = each.key
-    "local-hostname" = each.key
-  })
-
-  network_config = templatefile("${path.module}/config/network-config.yml", {
-    mac = each.value.mac
-  })
-}
-
-# --- Upload du cloud-init ISO dans le pool ---
-resource "libvirt_volume" "vm_cloudinit" {
-  for_each = var.vms
-
-  name = "${each.key}-cloudinit.iso"
-  pool = "default"
-
-  create = {
-    content = {
-      url = libvirt_cloudinit_disk.vm_init[each.key].path
-    }
-  }
-}
-
-# --- La VM elle-même ---
-# En v0.9+, "type" est obligatoire, les disques sont sous "devices.disks",
-# les interfaces sous "devices.interfaces"
-resource "libvirt_domain" "vm" {
-  for_each = var.vms
-
+  # --- Identité ---
   name        = each.key
-  type        = "kvm"
-  memory      = each.value.memory
-  memory_unit = "MiB"
-  vcpu        = each.value.vcpu
+  vmid        = each.value.vmid
+  target_node = var.proxmox_node
+  desc        = "VM ${each.key} - provisionné par Terraform"
 
-  # Configuration de l'OS
-  os = {
-    type         = "hvm"
-    type_arch    = "x86_64"
-    type_machine = "q35"
-    boot_devices = [{ dev = "hd" }]
+  # --- Clone du template ---
+  clone      = var.template_name
+  full_clone = true
+
+  # --- Ressources ---
+  cores   = each.value.vcpu
+  memory  = each.value.memory
+  sockets = 1
+  cpu     = "host"
+
+  # --- OS ---
+  os_type = "cloud-init"
+
+  # --- Disque principal ---
+  scsihw = "virtio-scsi-pci"
+  disk {
+    size    = each.value.disk
+    type    = "scsi"
+    storage = "local-lvm"
   }
 
-  # Features hyperviseur
-  features = {
-    acpi = true
+  # --- Réseau ---
+  network {
+    model  = "virtio"
+    bridge = "vmbr0"
   }
 
-  # Périphériques : disques, interfaces réseau, console
-  devices = {
-    # Disques
-    disks = [
-      {
-        # Disque principal (clone de l'image Ubuntu)
-        # driver type = qcow2 est indispensable sinon QEMU lit en raw
-        # et l'image avec backing store ne boot pas
-        driver = {
-          name = "qemu"
-          type = "qcow2"
-        }
-        source = {
-          volume = {
-            pool   = "default"
-            volume = libvirt_volume.vm_disk[each.key].name
-          }
-        }
-        target = {
-          dev = "vda"
-          bus = "virtio"
-        }
-      },
-      {
-        # Disque cloud-init (ISO)
-        device = "cdrom"
-        driver = {
-          name = "qemu"
-          type = "raw"
-        }
-        source = {
-          volume = {
-            pool   = "default"
-            volume = libvirt_volume.vm_cloudinit[each.key].name
-          }
-        }
-        target = {
-          dev = "sda"
-          bus = "sata"
-        }
-      }
-    ]
+  # --- Cloud-init ---
+  # Remplace cloud-init.yml et network-config.yml
+  ciuser  = "zeatop"
+  sshkeys = var.ssh_public_key
 
-    # Interface réseau
-    interfaces = [
-      {
-        model = {
-          type = "virtio"
-        }
-        source = {
-          network = {
-            network = libvirt_network.vm_network.name
-          }
-        }
-        mac = {
-          address = each.value.mac
-        }
-      }
-    ]
+  # Configuration IP statique
+  ipconfig0 = "ip=${each.value.ip}/24,gw=${each.value.gateway}"
 
-    # Console série (debug)
-    consoles = [
-      {
-        type = "pty"
-        target = {
-          type = "serial"
-          port = 0
-        }
-      }
+  # DNS
+  nameserver = "192.168.1.254"
+
+  # --- QEMU Guest Agent ---
+  agent = 1
+
+  # --- Démarrage automatique ---
+  onboot = true
+
+  # --- Lifecycle ---
+  lifecycle {
+    ignore_changes = [
+      network,
     ]
   }
 }
 
-# --- Output : affiche les noms des VMs créées ---
-output "vm_names" {
-  description = "Noms des VMs créées"
-  value       = [for name, vm in libvirt_domain.vm : vm.name]
+# --- Output : IPs des VMs ---
+output "vm_ips" {
+  description = "IPs des VMs créées"
+  value = {
+    for name, vm in proxmox_vm_qemu.vm :
+    name => vm.default_ipv4_address
+  }
 }

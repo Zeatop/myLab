@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # =============================================================================
-# test_vms.sh - Configuration sécurité + démarrage + vérification des VMs
+# test_vms.sh - Démarrage + vérification des VMs sur Proxmox
 # Usage: sudo ./test_vms.sh
 # =============================================================================
 
@@ -16,110 +16,53 @@ log()   { echo -e "${GREEN}[OK]${NC} $1"; }
 warn()  { echo -e "${YELLOW}[INFO]${NC} $1"; }
 error() { echo -e "${RED}[ERREUR]${NC} $1"; exit 1; }
 
-VMS=("ci-cd" "k8s-master" "k8s-worker-1" "k8s-worker-2" "bdd" "elk")
-QEMU_CONF="/etc/libvirt/qemu.conf"
+# VMIDs Proxmox (correspondant à variables.tf)
+declare -A VMS=(
+  ["ci-cd"]=110
+  ["k8s-master"]=120
+  ["k8s-worker-1"]=121
+  ["k8s-worker-2"]=122
+  ["bdd"]=130
+  ["elk"]=140
+)
+
+# IPs attendues
+declare -A IPS=(
+  ["ci-cd"]="192.168.1.10"
+  ["k8s-master"]="192.168.1.20"
+  ["k8s-worker-1"]="192.168.1.21"
+  ["k8s-worker-2"]="192.168.1.22"
+  ["bdd"]="192.168.1.30"
+  ["elk"]="192.168.1.40"
+)
 
 # --- Vérifications préalables ---
 [[ $EUID -ne 0 ]] && error "Ce script doit être lancé avec sudo"
 
 # =============================================================================
-# Étape 1 : Configuration de QEMU (qemu.conf)
+# Étape 1 : Démarrage des VMs
 #
-# Couche 1 - Permissions Unix :
-#   QEMU tourne par défaut en libvirt-qemu:kvm, mais Terraform crée les
-#   fichiers disque en root:root. On passe QEMU en root pour résoudre ça.
-#
-# Couche 3 - AppArmor par VM :
-#   libvirt génère dynamiquement un profil AppArmor par VM via virt-aa-helper.
-#   security_driver = "none" désactive ce mécanisme.
-# =============================================================================
-log "Configuration de QEMU..."
-
-# user = root
-if grep -q '^user = "root"' "$QEMU_CONF"; then
-  log "user = root déjà configuré"
-else
-  sed -i 's/^#user = "libvirt-qemu"/user = "root"/' "$QEMU_CONF"
-  sed -i 's/^user = .*/user = "root"/' "$QEMU_CONF"
-  grep -q '^user = "root"' "$QEMU_CONF" || echo 'user = "root"' >> "$QEMU_CONF"
-fi
-
-# group = root
-if grep -q '^group = "root"' "$QEMU_CONF"; then
-  log "group = root déjà configuré"
-else
-  sed -i 's/^#group = "kvm"/group = "root"/' "$QEMU_CONF"
-  sed -i 's/^group = .*/group = "root"/' "$QEMU_CONF"
-  grep -q '^group = "root"' "$QEMU_CONF" || echo 'group = "root"' >> "$QEMU_CONF"
-fi
-
-# security_driver = none
-if grep -q '^security_driver = "none"' "$QEMU_CONF"; then
-  log "security_driver = none déjà configuré"
-else
-  sed -i '/^security_driver/d' "$QEMU_CONF"
-  echo 'security_driver = "none"' >> "$QEMU_CONF"
-fi
-
-echo "  Configuration appliquée :"
-grep -E "^user|^group|^security_driver" "$QEMU_CONF" | sed 's/^/    /'
-
-# =============================================================================
-# Étape 2 : AppArmor en mode complain pour libvirtd (couche 2)
-#
-# Le profil /etc/apparmor.d/usr.sbin.libvirtd restreint ce que le daemon
-# libvirt peut faire. Le mode complain logue au lieu de bloquer.
-# =============================================================================
-log "Configuration AppArmor..."
-
-if ! command -v aa-complain &> /dev/null; then
-  warn "Installation de apparmor-utils..."
-  apt install -y apparmor-utils > /dev/null 2>&1
-fi
-
-aa-complain /usr/sbin/libvirtd 2>/dev/null || true
-aa-complain /etc/apparmor.d/usr.lib.libvirt.virt-aa-helper 2>/dev/null || true
-log "AppArmor libvirt en mode complain"
-
-# =============================================================================
-# Étape 3 : Arrêt complet et redémarrage de libvirtd
-#
-# Un simple restart ne suffit pas car les sockets maintiennent le daemon
-# en vie avec l'ancienne configuration. Il faut tout stopper.
-# =============================================================================
-log "Redémarrage complet de libvirtd..."
-
-systemctl stop libvirtd.service libvirtd.socket libvirtd-ro.socket libvirtd-admin.socket 2>/dev/null || true
-sleep 1
-systemctl start libvirtd
-sleep 2
-
-log "libvirtd redémarré (status: $(systemctl is-active libvirtd))"
-
-# =============================================================================
-# Étape 4 : Démarrage des VMs
-#
-# Note : on utilise STARTED=$((STARTED + 1)) au lieu de ((STARTED++))
-# car ((STARTED++)) retourne un code 1 quand STARTED vaut 0,
-# ce qui fait planter le script avec set -e.
+# Proxmox gère les permissions, pas besoin de configurer QEMU ou AppArmor
 # =============================================================================
 log "Démarrage des VMs..."
 STARTED=0
 FAILED=0
 
-for vm in "${VMS[@]}"; do
-  STATE=$(virsh domstate "$vm" 2>/dev/null || echo "unknown")
-  if [[ "$STATE" == "running" ]]; then
-    log "$vm déjà en cours d'exécution"
+for vm in "${!VMS[@]}"; do
+  VMID=${VMS[$vm]}
+  STATUS=$(qm status $VMID 2>/dev/null | awk '{print $2}' || echo "unknown")
+
+  if [[ "$STATUS" == "running" ]]; then
+    log "$vm (VMID $VMID) déjà en cours d'exécution"
     STARTED=$((STARTED + 1))
     continue
   fi
 
-  if virsh start "$vm" 2>/dev/null; then
-    log "$vm démarré"
+  if qm start $VMID 2>/dev/null; then
+    log "$vm (VMID $VMID) démarré"
     STARTED=$((STARTED + 1))
   else
-    echo -e "${RED}[ERREUR]${NC} $vm n'a pas pu démarrer"
+    echo -e "${RED}[ERREUR]${NC} $vm (VMID $VMID) n'a pas pu démarrer"
     FAILED=$((FAILED + 1))
   fi
 done
@@ -134,31 +77,36 @@ if [[ $FAILED -gt 0 ]]; then
 fi
 
 # =============================================================================
-# Étape 5 : Attente de cloud-init + vérification des IPs
+# Étape 2 : Attente de cloud-init + vérification des IPs
 # =============================================================================
 log "Attente de 60s pour cloud-init..."
 sleep 60
 
-log "Vérification des baux DHCP..."
+log "Vérification des IPs..."
 echo ""
-virsh net-dhcp-leases vm-network
+for vm in "${!VMS[@]}"; do
+  VMID=${VMS[$vm]}
+  EXPECTED_IP=${IPS[$vm]}
 
-echo ""
-log "Vérification des IPs par VM..."
-echo ""
-for vm in "${VMS[@]}"; do
-  IP=$(virsh domifaddr "$vm" 2>/dev/null | grep -oP '192\.168\.122\.\d+' || echo "pas d'IP")
-  printf "  %-15s %s\n" "$vm:" "$IP"
+  # Récupérer l'IP via QEMU guest agent
+  ACTUAL_IP=$(qm guest cmd $VMID network-get-interfaces 2>/dev/null | \
+    grep -oP '"ip-address"\s*:\s*"\K192\.168\.1\.\d+' | head -1 || echo "pas d'IP")
+
+  if [[ "$ACTUAL_IP" == "$EXPECTED_IP" ]]; then
+    printf "  ${GREEN}%-15s %s${NC}\n" "$vm:" "$ACTUAL_IP"
+  else
+    printf "  ${YELLOW}%-15s %s (attendu: %s)${NC}\n" "$vm:" "$ACTUAL_IP" "$EXPECTED_IP"
+  fi
 done
 
 # =============================================================================
-# Étape 6 : Test de connectivité SSH
+# Étape 3 : Test de connectivité SSH
 # =============================================================================
 echo ""
-log "Test SSH sur ci-cd (192.168.122.10)..."
-if ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no zeatop@192.168.122.10 "echo 'SSH OK'" 2>/dev/null; then
+log "Test SSH sur ci-cd (192.168.1.10)..."
+if ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no zeatop@192.168.1.10 "echo 'SSH OK'" 2>/dev/null; then
   log "Connexion SSH réussie !"
 else
   warn "SSH pas encore prêt. Réessaie dans quelques instants :"
-  echo "  ssh zeatop@192.168.122.10"
+  echo "  ssh zeatop@192.168.1.10"
 fi
