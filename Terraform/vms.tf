@@ -4,7 +4,22 @@
 # Le provider bpg/proxmox utilise proxmox_virtual_environment_vm
 # et gère le cloud-init via le bloc "initialization"
 # =============================================================================
+resource "proxmox_virtual_environment_file" "vendor_data" {
+  content_type = "snippets"
+  datastore_id = "local"
+  node_name    = var.proxmox_node
 
+  source_raw {
+    data = <<-EOF
+#cloud-config
+packages:
+  - qemu-guest-agent
+runcmd:
+  - systemctl enable --now qemu-guest-agent
+EOF
+    file_name = "vendor-data.yml"
+  }
+}
 resource "proxmox_virtual_environment_vm" "vm" {
   for_each = var.vms
 
@@ -47,6 +62,7 @@ resource "proxmox_virtual_environment_vm" "vm" {
   # Cloud-init : remplace cloud-init.yml et network-config.yml
   initialization {
     datastore_id = "local-lvm"
+    vendor_data_file_id = proxmox_virtual_environment_file.vendor_data.id
 
     ip_config {
       ipv4 {
