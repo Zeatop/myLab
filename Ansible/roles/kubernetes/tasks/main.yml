@@ -1,3 +1,13 @@
+- name: Installation des prérequis K8s
+  ansible.builtin.apt:
+    name:
+      - conntrack
+      - socat
+      - ebtables
+    state: present
+    update_cache: true
+
+
 - name: Activation des modules noyau pour K8s
   ansible.builtin.copy:
     dest: /etc/modules-load.d/k8s.conf
