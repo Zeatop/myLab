@@ -75,6 +75,7 @@ resource "proxmox_virtual_environment_vm" "vm" {
 
   # Arrêter la VM quand Terraform la supprime
   stop_on_destroy = true
+  timeout_stop_vm = 30
 }
 
 # --- Output : IPs des VMs ---
