@@ -19,6 +19,12 @@ variable "proxmox_node" {
   default     = "mylab"
 }
 
+variable "proxmox_root_password" {
+  description = "Mot de passe root de Proxmox (pour SSH)"
+  type        = string
+  sensitive   = true
+}
+
 variable "vms" {
   default = {
     "ci-cd" = {

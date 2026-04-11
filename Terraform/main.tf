@@ -17,7 +17,9 @@ provider "proxmox" {
   insecure  = true
 
   ssh {
-    agent = true
+    agent    = false
+    username = "root"
+    password = var.proxmox_root_password
     node {
       name    = "mylab"
       address = "192.168.1.144"
