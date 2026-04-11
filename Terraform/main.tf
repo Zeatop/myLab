@@ -19,7 +19,7 @@ provider "proxmox" {
   ssh {
     agent    = false
     username = "root"
-    password = var.proxmox_root_password
+    private_key = file("~/.ssh/id_ed25519")
     node {
       name    = "mylab"
       address = "192.168.1.144"
