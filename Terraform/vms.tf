@@ -40,7 +40,7 @@ resource "proxmox_virtual_environment_vm" "vm" {
 
   # Réseau
   network_device {
-    bridge = "vmbr0"
+    bridge = "vmbr1"
     model  = "virtio"
   }
 
@@ -51,8 +51,12 @@ resource "proxmox_virtual_environment_vm" "vm" {
     ip_config {
       ipv4 {
         address = "${each.value.ip}/24"
-        gateway = "192.168.1.254"
+        gateway = "10.0.0.1"
       }
+    }
+
+    dns {
+      servers = ["10.0.0.1"]
     }
 
     user_account {

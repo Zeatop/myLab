@@ -26,42 +26,42 @@ variable "vms" {
       memory = 4096
       vcpu   = 4
       disk   = 50
-      ip     = "192.168.1.10"
+      ip     = "10.0.0.10"
     }
     "k8s-master" = {
       vmid   = 120
       memory = 4096
       vcpu   = 2
       disk   = 30
-      ip     = "192.168.1.20"
+      ip     = "10.0.0.20"
     }
     "k8s-worker-1" = {
       vmid   = 121
       memory = 4096
       vcpu   = 4
       disk   = 80
-      ip     = "192.168.1.21"
+      ip     = "10.0.0.21"
     }
     "k8s-worker-2" = {
       vmid   = 122
       memory = 4096
       vcpu   = 4
       disk   = 80
-      ip     = "192.168.1.22"
+      ip     = "10.0.0.22"
     }
     "bdd" = {
       vmid   = 130
       memory = 4096
       vcpu   = 2
       disk   = 60
-      ip     = "192.168.1.30"
+      ip     = "10.0.0.30"
     }
     "elk" = {
       vmid   = 140
       memory = 3072
       vcpu   = 2
       disk   = 50
-      ip     = "192.168.1.40"
+      ip     = "10.0.0.40"
     }
   }
 }
