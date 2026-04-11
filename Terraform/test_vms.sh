@@ -28,12 +28,12 @@ declare -A VMS=(
 
 # IPs attendues
 declare -A IPS=(
-  ["ci-cd"]="192.168.1.10"
-  ["k8s-master"]="192.168.1.20"
-  ["k8s-worker-1"]="192.168.1.21"
-  ["k8s-worker-2"]="192.168.1.22"
-  ["bdd"]="192.168.1.30"
-  ["elk"]="192.168.1.40"
+  ["ci-cd"]="10.0.0.10"
+  ["k8s-master"]="10.0.0.20"
+  ["k8s-worker-1"]="10.0.0.21"
+  ["k8s-worker-2"]="10.0.0.22"
+  ["bdd"]="10.0.0.30"
+  ["elk"]="10.0.0.40"
 )
 
 # --- Vérifications préalables ---
@@ -90,7 +90,7 @@ for vm in "${!VMS[@]}"; do
 
   # Récupérer l'IP via QEMU guest agent
   ACTUAL_IP=$(qm guest cmd $VMID network-get-interfaces 2>/dev/null | \
-    grep -oP '"ip-address"\s*:\s*"\K192\.168\.1\.\d+' | head -1 || echo "pas d'IP")
+    grep -oP '"ip-address"\s*:\s*"\K10\.0\.0\.\d+' | head -1 || echo "pas d'IP")
 
   if [[ "$ACTUAL_IP" == "$EXPECTED_IP" ]]; then
     printf "  ${GREEN}%-15s %s${NC}\n" "$vm:" "$ACTUAL_IP"
@@ -103,10 +103,10 @@ done
 # Étape 3 : Test de connectivité SSH
 # =============================================================================
 echo ""
-log "Test SSH sur ci-cd (192.168.1.10)..."
-if ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no zeatop@192.168.1.10 "echo 'SSH OK'" 2>/dev/null; then
+log "Test SSH sur ci-cd (10.0.0.10)..."
+if ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no zeatop@10.0.0.10 "echo 'SSH OK'" 2>/dev/null; then
   log "Connexion SSH réussie !"
 else
   warn "SSH pas encore prêt. Réessaie dans quelques instants :"
-  echo "  ssh zeatop@192.168.1.10"
+  echo "  ssh zeatop@10.0.0.10"
 fi
