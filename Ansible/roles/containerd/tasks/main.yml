@@ -1,0 +1,40 @@
+- name: Installation des dépendances
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - gnupg
+    state: present
+    update_cache: true
+
+- name: Ajout de la clé GPG Docker
+  ansible.builtin.apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Ajout du dépôt Docker
+  ansible.builtin.apt_repository:
+    repo: "deb https://download.docker.com/linux/ubuntu noble stable"
+    state: present
+
+- name: Installation de containerd
+  ansible.builtin.apt:
+    name:
+      - containerd.io
+    state: present
+    update_cache: true
+
+- name: Génération de la config par défaut
+  ansible.builtin.shell: containerd config default > /etc/containerd/config.toml
+  changed_when: true
+
+- name: Activation du cgroup systemd (requis pour K8s)
+  ansible.builtin.replace:
+    path: /etc/containerd/config.toml
+    regexp: 'SystemdCgroup = false'
+    replace: 'SystemdCgroup = true'
+
+- name: Redémarrage de containerd
+  ansible.builtin.systemd:
+    name: containerd
+    state: restarted
+    enabled: true

@@ -1,0 +1,46 @@
+- name: Configuration sysctl pour Elasticsearch (utilisé par SonarQube)
+  ansible.builtin.sysctl:
+    name: vm.max_map_count
+    value: '262144'
+    state: present
+    reload: true
+
+- name: Création du volume SonarQube data
+  community.docker.docker_volume:
+    name: sonarqube_data
+    state: present
+
+- name: Création du volume SonarQube extensions
+  community.docker.docker_volume:
+    name: sonarqube_extensions
+    state: present
+
+- name: Création du volume SonarQube logs
+  community.docker.docker_volume:
+    name: sonarqube_logs
+    state: present
+
+- name: Démarrage de SonarQube
+  community.docker.docker_container:
+    name: sonarqube
+    image: sonarqube:lts-community
+    state: started
+    restart_policy: always
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    env:
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+
+- name: Attente du démarrage de SonarQube
+  ansible.builtin.wait_for:
+    port: 9000
+    delay: 15
+    timeout: 180
+
+- name: Affichage de l'accès SonarQube
+  ansible.builtin.debug:
+    msg: "SonarQube accessible sur http://10.0.0.10:9000 (admin/admin)"

@@ -1,0 +1,17 @@
+- name: Vérifier si le worker a déjà rejoint le cluster
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: kubelet_conf
+
+- name: Récupérer la commande de jonction
+  ansible.builtin.slurp:
+    src: /tmp/k8s_join_command
+  register: join_command_file
+  delegate_to: localhost
+  become: false
+  when: not kubelet_conf.stat.exists
+
+- name: Jonction au cluster Kubernetes
+  ansible.builtin.command: "{{ join_command_file.content | b64decode | trim }}"
+  when: not kubelet_conf.stat.exists
+  changed_when: true

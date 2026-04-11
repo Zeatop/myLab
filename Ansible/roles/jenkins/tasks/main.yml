@@ -1,0 +1,44 @@
+- name: Création du répertoire Jenkins
+  ansible.builtin.file:
+    path: /opt/jenkins
+    state: directory
+    mode: '0755'
+
+- name: Création du volume Jenkins
+  community.docker.docker_volume:
+    name: jenkins_data
+    state: present
+
+- name: Démarrage de Jenkins
+  community.docker.docker_container:
+    name: jenkins
+    image: jenkins/jenkins:lts
+    state: started
+    restart_policy: always
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    env:
+      JAVA_OPTS: "-Xmx1024m"
+
+- name: Attente du démarrage de Jenkins
+  ansible.builtin.wait_for:
+    port: 8080
+    delay: 10
+    timeout: 120
+
+- name: Récupération du mot de passe admin initial
+  community.docker.docker_container_exec:
+    container: jenkins
+    command: cat /var/jenkins_home/secrets/initialAdminPassword
+  register: jenkins_password
+  retries: 5
+  delay: 10
+  until: jenkins_password.rc == 0
+
+- name: Affichage du mot de passe admin Jenkins
+  ansible.builtin.debug:
+    msg: "Mot de passe admin Jenkins : {{ jenkins_password.stdout }}"

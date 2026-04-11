@@ -1,0 +1,58 @@
+- name: Configuration de base (toutes les VMs)
+  hosts: base
+  become: true
+  roles:
+    - base
+    - node-exporter
+
+- name: Docker CE (ci-cd)
+  hosts: docker
+  become: true
+  roles:
+    - docker
+
+- name: Containerd (noeuds K8s)
+  hosts: containerd
+  become: true
+  roles:
+    - containerd
+
+- name: Kubernetes (master + workers)
+  hosts: kubernetes
+  become: true
+  roles:
+    - kubernetes
+
+- name: Initialisation du master K8s
+  hosts: k8s_master
+  become: true
+  roles:
+    - k8s-master
+
+- name: Jonction des workers K8s
+  hosts: k8s_workers
+  become: true
+  roles:
+    - k8s-worker
+
+- name: CI/CD (Jenkins + SonarQube)
+  hosts: cicd
+  become: true
+  roles:
+    - jenkins
+    - sonarqube
+
+- name: Base de données (MongoDB)
+  hosts: database
+  become: true
+  roles:
+    - mongodb
+
+- name: Monitoring (ELK + Prometheus + Grafana)
+  hosts: monitoring
+  become: true
+  roles:
+    - elasticsearch
+    - kibana
+    - prometheus
+    - grafana

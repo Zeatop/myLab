@@ -1,0 +1,20 @@
+- name: Installation des paquets de base
+  ansible.builtin.apt:
+    name:
+      - curl
+      - wget
+      - htop
+      - vim
+      - net-tools
+    state: present
+    update_cache: true
+
+- name: Désactivation du swap (requis pour Kubernetes)
+  ansible.builtin.command: swapoff -a
+  changed_when: true
+
+- name: Désactivation permanente du swap (survit au reboot)
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '.*swap.*'
+    state: absent

@@ -1,0 +1,42 @@
+- name: Installation des dépendances
+  ansible.builtin.apt:
+    name:
+      - gnupg
+      - curl
+    state: present
+    update_cache: true
+
+- name: Ajout de la clé GPG MongoDB
+  ansible.builtin.apt_key:
+    url: https://pgp.mongodb.com/server-7.0.asc
+    state: present
+
+- name: Ajout du dépôt MongoDB
+  ansible.builtin.apt_repository:
+    repo: "deb https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/7.0 multiverse"
+    state: present
+
+- name: Installation de MongoDB
+  ansible.builtin.apt:
+    name:
+      - mongodb-org
+    state: present
+    update_cache: true
+
+- name: Configuration de MongoDB pour écouter sur toutes les interfaces
+  ansible.builtin.lineinfile:
+    path: /etc/mongod.conf
+    regexp: '^\s*bindIp:'
+    line: '  bindIp: 0.0.0.0'
+
+- name: Démarrage de MongoDB
+  ansible.builtin.systemd:
+    name: mongod
+    state: started
+    enabled: true
+
+- name: Attente du démarrage de MongoDB
+  ansible.builtin.wait_for:
+    port: 27017
+    delay: 5
+    timeout: 60

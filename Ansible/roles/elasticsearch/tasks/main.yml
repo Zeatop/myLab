@@ -1,0 +1,22 @@
+- name: Ajout de la clé GPG Elasticsearch
+  ansible.builtin.apt_key:
+    url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    state: present
+
+- name: Ajout du dépôt Elasticsearch
+  ansible.builtin.apt_repository:
+    repo: "deb https://artifacts.elastic.co/packages/8.x/apt stable main"
+    state: present
+
+- name: Installation d'Elasticsearch
+  ansible.builtin.apt:
+    name:
+      - elasticsearch
+    state: present
+    update_cache: true
+
+- name: Démarrage d'Elasticsearch
+  ansible.builtin.systemd:
+    name: elasticsearch
+    state: started
+    enabled: true

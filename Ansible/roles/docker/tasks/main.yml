@@ -1,0 +1,38 @@
+- name: Installation des dépendances Docker
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - gnupg
+    state: present
+    update_cache: true
+
+- name: Ajout de la clé GPG Docker
+  ansible.builtin.apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Ajout du dépôt Docker
+  ansible.builtin.apt_repository:
+    repo: "deb https://download.docker.com/linux/ubuntu noble stable"
+    state: present
+
+- name: Installation de Docker CE
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+    state: present
+    update_cache: true
+
+- name: Ajout de zeatop au groupe docker
+  ansible.builtin.user:
+    name: zeatop
+    groups: docker
+    append: true
+
+- name: Démarrage de Docker
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true
