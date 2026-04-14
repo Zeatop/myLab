@@ -1,5 +1,5 @@
 # =============================================================================
-# variables.tf - Specs des VMs
+# variables.tf - Specs des VMs et configuration réseau
 # =============================================================================
 
 variable "proxmox_api_token" {
@@ -65,3 +65,41 @@ variable "vms" {
     }
   }
 }
+
+# =============================================================================
+# Documentation réseau (non provisionné par Terraform, pour référence)
+# =============================================================================
+# 
+# OPNsense (VMID 100) - installé manuellement via ISO
+#   WAN: 192.168.1.159 (DHCP depuis Freebox)
+#   LAN: 10.0.0.1 (gateway pour toutes les VMs)
+#   Admin UI: https://192.168.1.159:8443
+#
+# Freebox → OPNsense port forwarding:
+#   80  → 192.168.1.159:80
+#   443 → 192.168.1.159:443
+#
+# OPNsense → K8s NAT rules (Traefik):
+#   WAN:80  → 10.0.0.22:30000  (Traefik HTTP)
+#   WAN:443 → 10.0.0.22:30001  (Traefik HTTPS)
+#
+# Domaines (DNS OVH → 82.67.163.199):
+#   leo-jackson.com      → portfolio-xp (K8s)
+#   leo-jackson.com/safemode → portfolio classique (K8s)
+#   judgeai.app          → judge-front (K8s)
+#   api.judgeai.app      → judge API (K8s)
+#
+# K8s Services (NodePorts):
+#   30000 - Traefik HTTP
+#   30001 - Traefik HTTPS
+#   30080 - Portfolio classique
+#   30081 - Portfolio XP
+#   30090 - Judge Front
+#   30091 - Judge API
+#
+# Traefik:
+#   Helm chart v39.0.7, Traefik v3.6.12
+#   Namespace: traefik
+#   Node: k8s-worker-2 (nodeSelector)
+#   Certificats Let's Encrypt: /opt/traefik-data/acme.json
+#   Email: leo_jacson@hotmail.fr

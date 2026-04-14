@@ -1,0 +1,43 @@
+# === LEO-JACKSON.COM ===
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: leo-jackson
+  namespace: default
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    # Portfolio XP sur la racine (mais PAS /safemode)
+    - match: Host(`leo-jackson.com`) && !PathPrefix(`/safemode`)
+      kind: Rule
+      services:
+        - name: portfolio-xp
+          port: 80
+    # Portfolio classique sur /safemode
+    - match: Host(`leo-jackson.com`) && PathPrefix(`/safemode`)
+      kind: Rule
+      services:
+        - name: portfolio
+          port: 80
+  tls:
+    certResolver: letsencrypt
+
+---
+# === JUDGEAI.APP ===
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: judgeai
+  namespace: default
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`judgeai.app`)
+      kind: Rule
+      services:
+        - name: judge-front
+          port: 80
+  tls:
+    certResolver: letsencrypt
