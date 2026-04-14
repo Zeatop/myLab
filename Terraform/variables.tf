@@ -23,28 +23,28 @@ variable "vms" {
   default = {
     "ci-cd" = {
       vmid   = 110
-      memory = 4096
+      memory = 6144
       vcpu   = 4
       disk   = 50
       ip     = "10.0.0.10"
     }
     "k8s-master" = {
       vmid   = 120
-      memory = 4096
+      memory = 2048
       vcpu   = 2
       disk   = 30
       ip     = "10.0.0.20"
     }
     "k8s-worker-1" = {
       vmid   = 121
-      memory = 4096
+      memory = 3072
       vcpu   = 4
       disk   = 80
       ip     = "10.0.0.21"
     }
     "k8s-worker-2" = {
       vmid   = 122
-      memory = 4096
+      memory = 3072
       vcpu   = 4
       disk   = 80
       ip     = "10.0.0.22"
